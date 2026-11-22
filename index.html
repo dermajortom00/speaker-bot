@@ -274,14 +274,6 @@ function botAntworten(eingabe){
     .replace(/speak bot/gi, "Speaker Bot")
     .trim();
 
-  if(unten.includes("nicht das schlauste") || unten.includes("nicht schlau")){
-    let roast = "Doch, ich bin schlau! Und du bist nicht die schlauste Schwester!";
-    document.getElementById('antwort').textContent = "🤖 Speaker Bot: " + roast;
-    inVerlauf(eingabe + " -> Roast!", 'roast');
-    sprechen(roast);
-    return;
-  }
-
   if(sauber === "" || sauber.length < 2){
     return;
   }
