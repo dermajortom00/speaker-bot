@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Speaker Bot - Version 2.4</title>
+<style>
+body{font-family:Arial;background:#111;color:white;text-align:center;padding:20px}
+h1{margin-bottom:5px}
+button{padding:12px 20px;font-size:16px;border-radius:12px;border:none;cursor:pointer;margin:5px}
+.modus{padding:15px 10px;background:#333;color:white;flex:1}
+.modus.aktiv{background:#7c3aed}
+#modusBox{display:flex;gap:8px;max-width:600px;margin:10px auto}
+select,input[type=range]{width:90%;max-width:500px;margin:5px}
+label{display:block;margin-top:15px;color:#aaa}
+#start{background:#25D366;color:white;padding:15px 30px;font-size:19px}
+#stop{background:#ff3b30;color:white;padding:15px 30px;font-size:19px}
+#testen{background:#007bff;color:white;padding:15px 30px;font-size:18px;width:90%;max-width:500px}
+#antwort{font-size:22px;color:#25D366;margin:20px auto;background:#222;padding:20px;border-radius:15px;max-width:600px;min-height:50px}
+.wert{color:#25D366;font-weight:bold}
+.mixInfo{background:#7c3aed;padding:10px;border-radius:10px;max-width:600px;margin:10px auto;font-size:14px}
+#pegelBox{background:#222;padding:15px;border-radius:15px;max-width:600px;margin:15px auto}
+#pegel{width:100%;height:80px;background:#000;border-radius:10px}
+#lautText{font-size:14px;color:#aaa;margin-top:5px}
+#verlaufBox{background:#222;padding:15px;border-radius:15px;max-width:600px;margin:15px auto;text-align:left}
+#verlauf{max-height:200px;overflow-y:auto}
+.verlaufEintrag{background:#333;padding:8px 10px;border-radius:8px;margin:5px 0;font-size:14px}
+.verlaufEintrag b{color:#25D366}
+.verlaufZeit{color:#aaa;font-size:11px;float:right}
+#verlaufLeeren{background:#555;color:white;padding:8px 15px;font-size:13px}
+#zähler{color:#25D366;font-weight:bold}
+</style>
+</head>
+<body>
+<h1>🎤 Speaker Bot <span style="font-size:14px;color:#aaa">v2.4</span></h1>
+<p>Deutsch + Deitsch + Englisch - mit automatischem Stimmen-Wechsel!</p>
+<p style="font-size:12px;color:#00ff00">✅ 2.4 - Mit Graf + Verlauf wie in 1.0!</p>
+
+<label>🌍 Sprache:</label>
+<select id="sprache">
+  <option value="de-DE">🇩🇪 Deutsch</option>
+  <option value="de-AT">🇦🇹 Deitsch / Österreichisch</option>
+  <option value="en-US">🇬🇧 Englisch / English</option>
+  <option value="mix" selected>🔥 ALLE ZUSAMMEN - Mix</option>
+</select>
+
+<div class="mixInfo" id="mixInfo">🔥 MIX AN: Deutsch = Jonas | Englisch = Ryan</div>
+
+<h2 style="margin-top:25px">STIMME WÄHLEN</h2>
+<div id="modusBox">
+  <button class="modus aktiv" data-modus="streamer">😎<br>Streamer<br><small>tief & cool</small></button>
+  <button class="modus" data-modus="roboter">🤖<br>Roboter<br><small>künstlich</small></button>
+  <button class="modus" data-modus="lustig">😂<br>Lustig<br><small>hoch & witzig</small></button>
+  <button class="modus" data-modus="normal">🙂<br>Normal<br><small>natürlich</small></button>
+</div>
+
+<label>Windows Stimme (für Deutsch / Deitsch):</label>
+<select id="stimme"></select>
+
+<label>Windows Stimme (für Englisch):</label>
+<select id="stimmeEN"></select>
+
+<label>Geschwindigkeit: <span class="wert" id="speedWert">1.0</span></label>
+<input type="range" id="speed" min="0.5" max="1.5" step="0.1" value="1.0">
+
+<label>Tonhöhe: <span class="wert" id="pitchWert">0.8</span></label>
+<input type="range" id="pitch" min="0.5" max="2" step="0.1" value="0.8">
+
+<label>Lautstärke: <span class="wert" id="volWert">1.0</span></label>
+<input type="range" id="volume" min="0" max="1" step="0.1" value="1.0">
+
+<br><br>
+<button id="start">▶️ START</button>
+<button id="stop">⏹️ STOP</button>
+
+<div id="antwort">Hier antwortet der Speaker Bot...</div>
+
+<button id="testen">🔊 STIMME TESTEN</button>
+
+<!-- NEU IN 2.4: GRAF -->
+<div id="pegelBox">
+  <h3 style="margin:0 0 10px 0">📊 Wie laut bist du?</h3>
+  <canvas id="pegel" width="560" height="80"></canvas>
+  <div id="lautText">Mikro aus - Drück START!</div>
+  <div style="font-size:12px;color:#888">Grün = du redest | Schwarz = leise</div>
+</div>
+
+<!-- NEU IN 2.4: VERLAUF WIE IN 1.0 -->
+<div id="verlaufBox">
+  <h3 style="margin:0">📜 Verlauf <span id="zähler">0 gehört</span> <button id="verlaufLeeren" style="float:right">🗑️ Leeren</button></h3>
+  <div id="verlauf">
+    <p style="color:#888;font-size:13px">Noch nix gehört... Drück START und sag was!</p>
+  </div>
+</div>
+
+<script>
+let recognition;
+let spreche = false;
+let stimmen = [];
+let modus = "streamer";
+let amSprechen = false;
+let micLaeuft = false;
+let gehoertAnzahl = 0;
+let pegelWerte = [];
+let audioCtx = null;
+let analyser = null;
+
+function stimmenLaden(){
+  stimmen = speechSynthesis.getVoices();
+  let sel = document.getElementById('stimme');
+  let selEN = document.getElementById('stimmeEN');
+  sel.innerHTML = "";
+  selEN.innerHTML = "";
+  stimmen.forEach((s,i)=>{
+    let o1 = document.createElement('option');
+    o1.value = i;
+    o1.textContent = s.name + " (" + s.lang + ")";
+    sel.appendChild(o1);
+    let o2 = document.createElement('option');
+    o2.value = i;
+    o2.textContent = s.name + " (" + s.lang + ")";
+    selEN.appendChild(o2);
+  });
+  let jonas = stimmen.findIndex(s=>s.name.includes("Jonas"));
+  if(jonas !== -1) sel.value = jonas;
+  else { let d = stimmen.findIndex(s=>s.lang.includes("de")); if(d !== -1) sel.value = d; }
+  let ryan = stimmen.findIndex(s=>s.name.includes("Ryan"));
+  if(ryan !== -1) selEN.value = ryan;
+  else { let e = stimmen.findIndex(s=>s.lang.startsWith("en")); if(e !== -1) selEN.value = e; }
+}
+speechSynthesis.onvoiceschanged = stimmenLaden;
+stimmenLaden();
+
+document.querySelectorAll('.modus').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('.modus').forEach(b=>b.classList.remove('aktiv'));
+    btn.classList.add('aktiv');
+    modus = btn.dataset.modus;
+    if(modus === "streamer"){ setSlider(1.0, 0.8); }
+    if(modus === "roboter"){ setSlider(0.9, 0.3); }
+    if(modus === "lustig"){ setSlider(1.1, 1.6); }
+    if(modus === "normal"){ setSlider(1.0, 1.0); }
+  };
+});
+
+function setSlider(speed, pitch){
+  document.getElementById('speed').value = speed;
+  document.getElementById('pitch').value = pitch;
+  document.getElementById('speedWert').textContent = speed.toFixed(1);
+  document.getElementById('pitchWert').textContent = pitch.toFixed(1);
+}
+document.getElementById('speed').oninput = e=>{ document.getElementById('speedWert').textContent = e.target.value; };
+document.getElementById('pitch').oninput = e=>{ document.getElementById('pitchWert').textContent = e.target.value; };
+document.getElementById('volume').oninput = e=>{ document.getElementById('volWert').textContent = e.target.value; };
+
+document.getElementById('sprache').onchange = e=>{
+  let info = document.getElementById('mixInfo');
+  if(e.target.value === 'mix') info.textContent = "🔥 MIX AN: Deutsch = Jonas | Englisch = Ryan";
+  if(e.target.value === 'de-DE') info.textContent = "🇦🇹 Deutsch - Stimme: Jonas";
+  if(e.target.value === 'de-AT') info.textContent = "🇦🇹 Deitsch - Stimme: Jonas";
+  if(e.target.value === 'en-US') info.textContent = "🇬🇧 Englisch - Stimme: Ryan";
+};
+
+function istEnglisch(text){
+  let t = " " + text.toLowerCase() + " ";
+  let englischWoerter = [" hello ", " hi ", " hey ", " what's up ", " whats up ", " how are you ", " let's go ", " lets go ", " thank you ", " thanks ", " please ", " good ", " yes ", " no ", " what ", " why ", " how ", " my ", " your ", " stream ", " chat ", " follow ", " shoutout ", " love ", " cool ", " nice ", " bro ", " man ", " welcome ", " goodbye ", " bye ", " check ", " look ", " play ", " game "];
+  let punkte = 0;
+  for(let w of englischWoerter){ if(t.includes(w)) punkte++; }
+  return punkte >= 1;
+}
+
+function piepMachen(){
+  try{
+    let audio = new (window.AudioContext || window.webkitAudioContext)();
+    let o = audio.createOscillator();
+    o.frequency.value = 1000;
+    o.connect(audio.destination);
+    o.start();
+    o.stop(audio.currentTime + 0.5);
+  }catch(e){}
+}
+
+function nameFix(text, istEN){
+  if(istEN) return text.replace(/Speaker Bott/gi, "Speaker Bot").replace(/Spieker Bott/gi, "Speaker Bot");
+  let neu = text.replace(/Speaker Bot/gi, "Spieker Bott");
+  neu = neu.replace(/Speaker Bott/gi, "Spieker Bott");
+  neu = neu.replace(/\bBot\b/gi, "Bott");
+  return neu;
+}
+
+function stimmeEinstellen(u, text){
+  let wahl = document.getElementById('sprache').value;
+  let selDE = document.getElementById('stimme');
+  let selEN = document.getElementById('stimmeEN');
+  if(wahl === 'mix'){
+    if(istEnglisch(text)){
+      if(stimmen[selEN.value]) { u.voice = stimmen[selEN.value]; u.lang = stimmen[selEN.value].lang; }
+      else { let e = stimmen.find(s=>s.lang.startsWith('en')); if(e){ u.voice = e; u.lang = e.lang; } }
+      if(!u.lang) u.lang = 'en-GB';
+    } else {
+      if(stimmen[selDE.value]) { u.voice = stimmen[selDE.value]; u.lang = stimmen[selDE.value].lang; }
+      else { let d = stimmen.find(s=>s.lang.includes('de')); if(d){ u.voice = d; u.lang = d.lang; } }
+      if(!u.lang) u.lang = 'de-AT';
+    }
+  } else if(wahl === 'en-US'){
+    if(stimmen[selEN.value]) { u.voice = stimmen[selEN.value]; u.lang = stimmen[selEN.value].lang; }
+    if(!u.lang) u.lang = 'en-GB';
+  } else {
+    if(stimmen[selDE.value]) { u.voice = stimmen[selDE.value]; u.lang = stimmen[selDE.value].lang; }
+    if(!u.lang) u.lang = 'de-AT';
+  }
+  u.rate = parseFloat(document.getElementById('speed').value);
+  u.pitch = parseFloat(document.getElementById('pitch').value);
+  u.volume = parseFloat(document.getElementById('volume').value);
+  return u;
+}
+
+function sprechen(text){
+  amSprechen = true;
+  let wahl = document.getElementById('sprache').value;
+  let istEN = (wahl === 'en-US') || (wahl === 'mix' && istEnglisch(text));
+  text = nameFix(text, istEN);
+  let u = new SpeechSynthesisUtterance(text);
+  u = stimmeEinstellen(u, text);
+  u.onend = ()=>{ setTimeout(()=>{ amSprechen = false; }, 300); };
+  u.onerror = ()=>{ amSprechen = false; };
+  speechSynthesis.cancel();
+  setTimeout(()=>{ speechSynthesis.speak(u); }, 150);
+}
+
+// NEU 2.4: In Verlauf eintragen wie in 1.0!
+function inVerlauf(text, typ){
+  gehoertAnzahl++;
+  document.getElementById('zähler').textContent = gehoertAnzahl + " gehört";
+  let box = document.getElementById('verlauf');
+  if(gehoertAnzahl === 1) box.innerHTML = "";
+  let jetzt = new Date();
+  let zeit = jetzt.getHours().toString().padStart(2,'0') + ":" + jetzt.getMinutes().toString().padStart(2,'0') + ":" + jetzt.getSeconds().toString().padStart(2,'0');
+  let div = document.createElement('div');
+  div.className = 'verlaufEintrag';
+  let icon = typ === 'piep' ? '🤫' : (typ === 'roast' ? '🔥' : '🎤');
+  div.innerHTML = icon + " <b>" + text + "</b> <span class='verlaufZeit'>" + zeit + "</span>";
+  box.prepend(div);
+}
+document.getElementById('verlaufLeeren').onclick = ()=>{
+  document.getElementById('verlauf').innerHTML = '<p style="color:#888;font-size:13px">Verlauf geleert!</p>';
+  gehoertAnzahl = 0;
+  document.getElementById('zähler').textContent = "0 gehört";
+};
+
+function botAntworten(eingabe){
+  if(amSprechen) return;
+  let boeseWoerter = ["scheiß","scheisse","scheiss","fuck","shit","arsch","hurensohn","wichser","kacke","fotze","hure","bastard"];
+  let unten = eingabe.toLowerCase();
+  for(let wort of boeseWoerter){
+    if(unten.includes(wort)){
+      document.getElementById('antwort').textContent = "🤫 Speaker Bot: PIEP!";
+      inVerlauf(eingabe + " -> PIEP!", 'piep');
+      piepMachen();
+      return;
+    }
+  }
+  let sauber = eingabe
+    .replace(/hju/gi, "Hallo")
+    .replace(/^ju$/gi, "Hallo")
+    .replace(/^hu$/gi, "Hallo")
+    .replace(/^allo$/gi, "Hallo")
+    .replace(/speakerbutt/gi, "Speaker Bot")
+    .replace(/speaker\s*butt/gi, "Speaker Bot")
+    .replace(/schwerer brot/gi, "Speaker Bot")
+    .replace(/speka\s*bo+o+t/gi, "Speaker Bot")
+    .replace(/spiekerboot/gi, "Speaker Bot")
+    .replace(/schwerer boot/gi, "Speaker Bot")
+    .replace(/speaker boot/gi, "Speaker Bot")
+    .replace(/speak bot/gi, "Speaker Bot")
+    .trim();
+
+  if(unten.includes("nicht das schlauste") || unten.includes("nicht schlau")){
+    let roast = "Doch, ich bin schlau! Und du bist nicht die schlauste Schwester!";
+    document.getElementById('antwort').textContent = "🤖 Speaker Bot: " + roast;
+    inVerlauf(eingabe + " -> Roast!", 'roast');
+    sprechen(roast);
+    return;
+  }
+
+  if(sauber === "" || sauber.length < 2){
+    return;
+  }
+  let antwort = sauber;
+  document.getElementById('antwort').textContent = "🤖 Speaker Bot: " + antwort;
+  inVerlauf(antwort, 'normal');
+  sprechen(antwort);
+}
+
+function stimmeTesten(){
+  let wahl = document.getElementById('sprache').value;
+  if(wahl === 'mix'){
+    document.getElementById('antwort').textContent = "🤖 Speaker Bot: Hallo, ich bin der Speaker Bot!";
+    sprechen("Hallo, ich bin der Speaker Bot! Wie klingt meine Stimme?");
+    return;
+  }
+  let testText = "Hallo, ich bin der Speaker Bot! Wie klingt meine Stimme?";
+  if(wahl === 'en-US') testText = "Hello, I am the Speaker Bot! How does my voice sound?";
+  if(wahl === 'de-AT') testText = "Servus, ich bin der Speaker Bot! Wie klingt meine Stimme?";
+  document.getElementById('antwort').textContent = "🤖 Speaker Bot: " + testText;
+  sprechen(testText);
+}
+document.getElementById('testen').onclick = stimmeTesten;
+
+function micStarten(){
+  if(!recognition) return;
+  if(micLaeuft) return;
+  try{
+    recognition.start();
+    micLaeuft = true;
+  }catch(e){}
+}
+
+// NEU 2.4: GRAF ZEICHNEN!
+function grafZeichnen(){
+  let canvas = document.getElementById('pegel');
+  let ctx = canvas.getContext('2d');
+  let laut = 0;
+  if(analyser){
+    let daten = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(daten);
+    let summe = 0;
+    for(let i=0;i<daten.length;i++) summe += daten[i];
+    laut = summe / daten.length / 255;
+  }
+  pegelWerte.push(laut);
+  if(pegelWerte.length > 80) pegelWerte.shift();
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Linie zeichnen
+  ctx.beginPath();
+  ctx.strokeStyle = "#25D366";
+  ctx.lineWidth = 3;
+  for(let i=0;i<pegelWerte.length;i++){
+    let x = i * (canvas.width / 80);
+    let y = canvas.height - (pegelWerte[i] * canvas.height * 1.2);
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // Balken unten
+  ctx.fillStyle = "#25D366";
+  ctx.fillRect(0, canvas.height-5, laut * canvas.width, 5);
+
+  let text = document.getElementById('lautText');
+  if(!spreche) text.textContent = "Mikro aus - Drück START!";
+  else if(laut > 0.25) text.textContent = "🔊 DU REDEST! Lautstärke: " + Math.round(laut*100) + "%";
+  else if(laut > 0.08) text.textContent = "🎤 Ich höre was... Lautstärke: " + Math.round(laut*100) + "%";
+  else text.textContent = "🤫 Leise... Lautstärke: " + Math.round(laut*100) + "%";
+
+  requestAnimationFrame(grafZeichnen);
+}
+grafZeichnen();
+
+document.getElementById('start').onclick = async ()=>{
+  try{
+    let stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    // Für den Graf: Mikro an Analyser anschließen!
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let quelle = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    quelle.connect(analyser);
+  }catch(e){
+    document.getElementById('antwort').textContent = "Bitte Mikro erlauben und nochmal START drücken!";
+    return;
+  }
+
+  if(recognition && spreche){
+    document.getElementById('antwort').textContent = "Läuft schon!";
+    return;
+  }
+
+  let SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  let wahl = document.getElementById('sprache').value;
+  recognition.lang = wahl === 'mix' ? 'de-AT' : wahl;
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (e)=>{
+    if(amSprechen) return;
+    let letzter = e.results[e.results.length-1][0].transcript;
+    botAntworten(letzter);
+  };
+  recognition.onend = ()=>{
+    micLaeuft = false;
+    if(spreche){
+      setTimeout(()=>{ micStarten(); }, 500);
+    }
+  };
+  recognition.onerror = (e)=>{
+    if(e.error === 'not-allowed'){
+      spreche = false;
+      micLaeuft = false;
+      document.getElementById('antwort').textContent = "Mikro wurde blockiert! Oben auf das Schloss klicken -> Mikro erlauben!";
+    }
+  };
+  spreche = true;
+  micStarten();
+  document.getElementById('antwort').textContent = "Ich höre zu... sag was!";
+};
+document.getElementById('stop').onclick = ()=>{
+  spreche = false;
+  micLaeuft = false;
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
+  speechSynthesis.cancel();
+  if(audioCtx){ try{ audioCtx.close(); }catch(e){} }
+  analyser = null;
+  document.getElementById('antwort').textContent = "Gestoppt.";
+};
+</script>
+</body>
+</html>
