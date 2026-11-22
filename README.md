@@ -16,7 +16,6 @@ Mit Jonas (Deutsch) und Ryan (Englisch)!
 - 📊 **Graf** - Zeigt live, wie laut du bist!
 - 📜 **Verlauf** - Alles was er gehört hat, mit Uhrzeit!
 - 🤫 **Piep-Filter** - Schimpfwörter werden zu PIEP!
-- 🔥 **Roast-Modus** - Sag "nicht das schlauste" und schau was passiert 😂
 - 🎙️ **Mikro fragt nur 1x** - Kein nerviges Nachfragen mehr!
 - 🤫 **Bleibt leise** - Wenn er nix versteht, sagt er gar nix!
 
