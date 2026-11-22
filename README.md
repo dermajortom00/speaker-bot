@@ -5,7 +5,7 @@
 Der Speaker Bot hört dir zu und spricht alles nach, was du sagst.
 Mit Jonas (Deutsch) und Ryan (Englisch)!
 
-**Live ausprobieren:** https://DEIN-NAME.github.io/speaker-bot/
+**Live ausprobieren:** (https://dermajortom00.github.io/speaker-bot/)
 
 ---
 
@@ -21,7 +21,7 @@ Mit Jonas (Deutsch) und Ryan (Englisch)!
 
 ## 🚀 So benutzt du ihn
 
-1. Link öffnen: https://DEIN-NAME.github.io/speaker-bot/
+1. Link öffnen (https://dermajortom00.github.io/speaker-bot/)
 2. Auf **▶️ START** klicken
 3. Mikro erlauben - auf **Zulassen** klicken
 4. Einfach reden!
