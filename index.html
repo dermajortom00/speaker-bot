@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Speaker Bot - Version 2.4</title>
+<title>Speaker Bot - Version 2.6 VOLL</title>
 <style>
 body{font-family:Arial;background:#111;color:white;text-align:center;padding:20px}
 h1{margin-bottom:5px}
@@ -31,9 +31,9 @@ label{display:block;margin-top:15px;color:#aaa}
 </style>
 </head>
 <body>
-<h1>🎤 Speaker Bot <span style="font-size:14px;color:#aaa">v2.4</span></h1>
+<h1>🎤 Speaker Bot <span style="font-size:14px;color:#aaa">v2.6 VOLL</span></h1>
 <p>Deutsch + Deitsch + Englisch - mit automatischem Stimmen-Wechsel!</p>
-<p style="font-size:12px;color:#00ff00">✅ 2.4 - Mit Graf + Verlauf wie in 1.0!</p>
+<p style="font-size:12px;color:#00ff00">✅ 2.6 VOLL - Alle Zeilen wieder da + Stimmenmix DE-EN verbessert!</p>
 
 <label>🌍 Sprache:</label>
 <select id="sprache">
@@ -76,7 +76,6 @@ label{display:block;margin-top:15px;color:#aaa}
 
 <button id="testen">🔊 STIMME TESTEN</button>
 
-<!-- NEU IN 2.4: GRAF -->
 <div id="pegelBox">
   <h3 style="margin:0 0 10px 0">📊 Wie laut bist du?</h3>
   <canvas id="pegel" width="560" height="80"></canvas>
@@ -84,7 +83,6 @@ label{display:block;margin-top:15px;color:#aaa}
   <div style="font-size:12px;color:#888">Grün = du redest | Schwarz = leise</div>
 </div>
 
-<!-- NEU IN 2.4: VERLAUF WIE IN 1.0 -->
 <div id="verlaufBox">
   <h3 style="margin:0">📜 Verlauf <span id="zähler">0 gehört</span> <button id="verlaufLeeren" style="float:right">🗑️ Leeren</button></h3>
   <div id="verlauf">
@@ -106,6 +104,7 @@ let analyser = null;
 
 function stimmenLaden(){
   stimmen = speechSynthesis.getVoices();
+  if(!stimmen.length) return;
   let sel = document.getElementById('stimme');
   let selEN = document.getElementById('stimmeEN');
   sel.innerHTML = "";
@@ -129,6 +128,7 @@ function stimmenLaden(){
 }
 speechSynthesis.onvoiceschanged = stimmenLaden;
 stimmenLaden();
+setTimeout(stimmenLaden, 500);
 
 document.querySelectorAll('.modus').forEach(btn=>{
   btn.onclick = ()=>{
@@ -160,12 +160,18 @@ document.getElementById('sprache').onchange = e=>{
   if(e.target.value === 'en-US') info.textContent = "🇬🇧 Englisch - Stimme: Ryan";
 };
 
+// --- STIMMENMIX DE-EN VERBESSERT - ZÄHLT BEIDE SPRACHEN ---
 function istEnglisch(text){
   let t = " " + text.toLowerCase() + " ";
-  let englischWoerter = [" hello ", " hi ", " hey ", " what's up ", " whats up ", " how are you ", " let's go ", " lets go ", " thank you ", " thanks ", " please ", " good ", " yes ", " no ", " what ", " why ", " how ", " my ", " your ", " stream ", " chat ", " follow ", " shoutout ", " love ", " cool ", " nice ", " bro ", " man ", " welcome ", " goodbye ", " bye ", " check ", " look ", " play ", " game "];
-  let punkte = 0;
-  for(let w of englischWoerter){ if(t.includes(w)) punkte++; }
-  return punkte >= 1;
+  let englischWoerter = [" hello ", " hi ", " hey ", " what's up ", " whats up ", " how are you ", " let's go ", " lets go ", " thank you ", " thanks ", " please ", " good ", " yes ", " no ", " what ", " why ", " how ", " my ", " your ", " stream ", " chat ", " follow ", " shoutout ", " love ", " cool ", " nice ", " bro ", " man ", " welcome ", " goodbye ", " bye ", " check ", " look ", " play ", " game ", " awesome ", " amazing ", " crazy ", " funny ", " guys ", " everyone ", " today ", " really ", " super ", " perfect ", " wow ", " dude ", " let's "];
+  let deutschWoerter = [" hallo ", " servus ", " und ", " ich ", " bin ", " das ", " ist ", " nicht ", " was ", " wie ", " geht ", " danke ", " bitte ", " geil ", " krass ", " alter ", " leute ", " schau ", " mal ", " heute ", " ja ", " nein ", " warum ", " alles ", " klar ", " und ", " der ", " die ", " das "];
+  let enPunkte = 0;
+  let dePunkte = 0;
+  for(let w of englischWoerter){ if(t.includes(w)) enPunkte++; }
+  for(let w of deutschWoerter){ if(t.includes(w)) dePunkte++; }
+  if(enPunkte > 0 && enPunkte >= dePunkte) return true;
+  if(enPunkte > 0 && dePunkte === 0) return true;
+  return false;
 }
 
 function piepMachen(){
@@ -191,43 +197,43 @@ function stimmeEinstellen(u, text){
   let wahl = document.getElementById('sprache').value;
   let selDE = document.getElementById('stimme');
   let selEN = document.getElementById('stimmeEN');
-  if(wahl === 'mix'){
-    if(istEnglisch(text)){
-      if(stimmen[selEN.value]) { u.voice = stimmen[selEN.value]; u.lang = stimmen[selEN.value].lang; }
-      else { let e = stimmen.find(s=>s.lang.startsWith('en')); if(e){ u.voice = e; u.lang = e.lang; } }
-      if(!u.lang) u.lang = 'en-GB';
-    } else {
-      if(stimmen[selDE.value]) { u.voice = stimmen[selDE.value]; u.lang = stimmen[selDE.value].lang; }
-      else { let d = stimmen.find(s=>s.lang.includes('de')); if(d){ u.voice = d; u.lang = d.lang; } }
-      if(!u.lang) u.lang = 'de-AT';
-    }
-  } else if(wahl === 'en-US'){
+  let useEN = false;
+  if(wahl === 'en-US') useEN = true;
+  else if(wahl === 'mix') useEN = istEnglisch(text);
+  else useEN = false;
+  if(useEN){
     if(stimmen[selEN.value]) { u.voice = stimmen[selEN.value]; u.lang = stimmen[selEN.value].lang; }
-    if(!u.lang) u.lang = 'en-GB';
+    else { let e = stimmen.find(s=>s.lang.startsWith('en')); if(e){ u.voice = e; u.lang = e.lang; } }
+    if(!u.lang) u.lang = 'en-US';
   } else {
     if(stimmen[selDE.value]) { u.voice = stimmen[selDE.value]; u.lang = stimmen[selDE.value].lang; }
-    if(!u.lang) u.lang = 'de-AT';
+    else { let d = stimmen.find(s=>s.lang.includes('de')); if(d){ u.voice = d; u.lang = d.lang; } }
+    if(!u.lang) u.lang = 'de-DE';
   }
   u.rate = parseFloat(document.getElementById('speed').value);
   u.pitch = parseFloat(document.getElementById('pitch').value);
   u.volume = parseFloat(document.getElementById('volume').value);
+  u._isEN = useEN;
   return u;
 }
 
 function sprechen(text){
+  speechSynthesis.cancel();
   amSprechen = true;
   let wahl = document.getElementById('sprache').value;
   let istEN = (wahl === 'en-US') || (wahl === 'mix' && istEnglisch(text));
   text = nameFix(text, istEN);
   let u = new SpeechSynthesisUtterance(text);
   u = stimmeEinstellen(u, text);
+  if(wahl === 'mix'){
+    document.getElementById('mixInfo').textContent = u._isEN ? "🇬🇧 Spricht gerade: ENGLISCH - Ryan" : "🇩🇪 Spricht gerade: DEUTSCH - Jonas";
+    setTimeout(()=>{ if(document.getElementById('sprache').value==='mix') document.getElementById('mixInfo').textContent="🔥 MIX AN: Deutsch = Jonas | Englisch = Ryan"; }, 3000);
+  }
   u.onend = ()=>{ setTimeout(()=>{ amSprechen = false; }, 300); };
   u.onerror = ()=>{ amSprechen = false; };
-  speechSynthesis.cancel();
-  setTimeout(()=>{ speechSynthesis.speak(u); }, 150);
+  speechSynthesis.speak(u);
 }
 
-// NEU 2.4: In Verlauf eintragen wie in 1.0!
 function inVerlauf(text, typ){
   gehoertAnzahl++;
   document.getElementById('zähler').textContent = gehoertAnzahl + " gehört";
@@ -286,8 +292,9 @@ function botAntworten(eingabe){
 function stimmeTesten(){
   let wahl = document.getElementById('sprache').value;
   if(wahl === 'mix'){
-    document.getElementById('antwort').textContent = "🤖 Speaker Bot: Hallo, ich bin der Speaker Bot!";
-    sprechen("Hallo, ich bin der Speaker Bot! Wie klingt meine Stimme?");
+    document.getElementById('antwort').textContent = "🤖 Teste beide Stimmen... Zuerst Jonas, dann Ryan!";
+    sprechen("Hallo, ich bin Jonas, die deutsche Stimme!");
+    setTimeout(()=>{ sprechen("Hello, I am Ryan, the English voice!"); }, 3000);
     return;
   }
   let testText = "Hallo, ich bin der Speaker Bot! Wie klingt meine Stimme?";
@@ -307,7 +314,6 @@ function micStarten(){
   }catch(e){}
 }
 
-// NEU 2.4: GRAF ZEICHNEN!
 function grafZeichnen(){
   let canvas = document.getElementById('pegel');
   let ctx = canvas.getContext('2d');
@@ -324,7 +330,6 @@ function grafZeichnen(){
 
   ctx.fillStyle = "#000";
   ctx.fillRect(0,0,canvas.width,canvas.height);
-  // Linie zeichnen
   ctx.beginPath();
   ctx.strokeStyle = "#25D366";
   ctx.lineWidth = 3;
@@ -335,7 +340,6 @@ function grafZeichnen(){
     else ctx.lineTo(x,y);
   }
   ctx.stroke();
-  // Balken unten
   ctx.fillStyle = "#25D366";
   ctx.fillRect(0, canvas.height-5, laut * canvas.width, 5);
 
@@ -352,8 +356,8 @@ grafZeichnen();
 document.getElementById('start').onclick = async ()=>{
   try{
     let stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    // Für den Graf: Mikro an Analyser anschließen!
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
     let quelle = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
@@ -369,9 +373,13 @@ document.getElementById('start').onclick = async ()=>{
   }
 
   let SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    document.getElementById('antwort').textContent = "Dein Browser kann das nicht! Nimm Google Chrome!";
+    return;
+  }
   recognition = new SR();
   let wahl = document.getElementById('sprache').value;
-  recognition.lang = wahl === 'mix' ? 'de-AT' : wahl;
+  recognition.lang = wahl === 'mix' ? 'de-DE' : wahl;
   recognition.continuous = true;
   recognition.interimResults = false;
   recognition.onresult = (e)=>{
@@ -401,6 +409,7 @@ document.getElementById('stop').onclick = ()=>{
   micLaeuft = false;
   if(recognition){ try{ recognition.stop(); }catch(e){} }
   speechSynthesis.cancel();
+  amSprechen = false;
   if(audioCtx){ try{ audioCtx.close(); }catch(e){} }
   analyser = null;
   document.getElementById('antwort').textContent = "Gestoppt.";
